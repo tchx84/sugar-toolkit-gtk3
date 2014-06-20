@@ -22,6 +22,7 @@
 """
 STABLE.
 """
+import logging
 import textwrap
 
 from gi.repository import Gtk
@@ -208,6 +209,9 @@ class Palette(PaletteWindow):
         return self._full_request
 
     def popup(self, immediate=False, state=None):
+        if self._up is True:
+            return
+        logging.debug('Palette.popup with i: %r, s: %r, up: %r', immediate, state, self._up)
         if self._invoker is not None:
             self._update_full_request()
 
@@ -223,6 +227,9 @@ class Palette(PaletteWindow):
             self._secondary_anim.stop()
 
     def popdown(self, immediate=False):
+        if self._up is not True:
+            return
+        logging.debug('Palette.popdown with i: %r, up: %r', immediate, self._up)
         if immediate:
             self._secondary_anim.stop()
             # to suppress glitches while later re-opening

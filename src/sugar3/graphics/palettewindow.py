@@ -36,6 +36,7 @@ from sugar3.graphics import palettegroup
 from sugar3.graphics import animator
 from sugar3.graphics import style
 
+_SUSPEND_PRESSES_TIMEOUT = 2000
 
 def _calculate_gap(a, b):
     """Helper function to find the gap position and size of widget a"""
@@ -518,6 +519,10 @@ class PaletteWindow(GObject.GObject):
 
         self._mouse_detector = MouseSpeedDetector(200, 5)
 
+    def _temporally_suspend_events(self):
+        if self._invoker is not None:
+            self._invoker.do_temporally_suspend_events()
+
     def _setup_widget(self):
         self._widget.connect('show', self.__show_cb)
         self._widget.connect('hide', self.__hide_cb)
@@ -662,6 +667,7 @@ class PaletteWindow(GObject.GObject):
         else:
             self._popup_anim.stop()
             self._widget.popup(self._invoker)
+            self._temporally_suspend_events()
             # we have to invoke update_position() twice
             # since WM could ignore first move() request
             self.update_position()
@@ -676,6 +682,7 @@ class PaletteWindow(GObject.GObject):
             self._popdown_anim.stop()
             if self._widget is not None:
                 self._widget.popdown()
+                self._temporally_suspend_events()
 
     def on_invoker_enter(self):
         self._popdown_anim.stop()
@@ -1092,9 +1099,16 @@ class WidgetInvoker(Invoker):
         self._long_pressed_recognized = False
         self._long_pressed_hid = None
         self._long_pressed_controller = SugarGestures.LongPressController()
+        self._connected = False
 
         if parent or widget:
             self.attach_widget(parent, widget)
+
+
+    def do_temporally_suspend_events(self):
+        if self._connected is True:
+            self._disconnect_events()
+            GLib.timeout_add(_SUSPEND_PRESSES_TIMEOUT, self._connect_events)
 
     def attach_widget(self, parent, widget=None):
         if widget:
@@ -1103,7 +1117,10 @@ class WidgetInvoker(Invoker):
             self._widget = parent
 
         self.notify('widget')
+        self._connect_events()
+        self.attach(parent)
 
+    def _connect_events(self):
         self._enter_hid = self._widget.connect('enter-notify-event',
                                                self.__enter_notify_event_cb)
         self._leave_hid = self._widget.connect('leave-notify-event',
@@ -1124,10 +1141,15 @@ class WidgetInvoker(Invoker):
             self._widget,
             SugarGestures.EventControllerFlags.NONE)
 
-        self.attach(parent)
+        logging.debug('Palette._connected is True')
+        self._connected = True
+
 
     def detach(self):
         Invoker.detach(self)
+        self._disconnect_events()
+
+    def _disconnect_events(self):
         self._widget.disconnect(self._enter_hid)
         self._widget.disconnect(self._leave_hid)
         self._widget.disconnect(self._release_hid)
@@ -1137,6 +1159,9 @@ class WidgetInvoker(Invoker):
         self._widget.disconnect(self._touch_hid)
         self._long_pressed_controller.detach(self._widget)
         self._long_pressed_controller.disconnect(self._long_pressed_hid)
+
+        logging.debug('Palette._connected is False')
+        self._connected = False
 
     def get_rect(self):
         allocation = self._widget.get_allocation()
@@ -1275,14 +1300,23 @@ class CursorInvoker(Invoker):
         self._long_pressed_recognized = False
         self._long_pressed_hid = None
         self._long_pressed_controller = SugarGestures.LongPressController()
+        self._connected = False
 
         if parent:
             self.attach(parent)
 
+
+    def do_temporally_suspend_events(self):
+        if self._connected is True:
+            self._disconnect_events()
+            GLib.timeout_add(_SUSPEND_PRESSES_TIMEOUT, self._connect_events)
+
     def attach(self, parent):
         Invoker.attach(self, parent)
-
         self._item = parent
+        self._connect_events()
+
+    def _connect_events(self):
         self._enter_hid = self._item.connect('enter-notify-event',
                                              self.__enter_notify_event_cb)
         self._leave_hid = self._item.connect('leave-notify-event',
@@ -1296,13 +1330,22 @@ class CursorInvoker(Invoker):
             self._item,
             SugarGestures.EventControllerFlags.NONE)
 
+        logging.debug('Palette._connected is True')
+        self._connected = True
+
     def detach(self):
         Invoker.detach(self)
+        self._disconnect_events()
+
+    def _disconnect_events(self):
         self._item.disconnect(self._enter_hid)
         self._item.disconnect(self._leave_hid)
         self._item.disconnect(self._release_hid)
         self._long_pressed_controller.detach(self._item)
         self._long_pressed_controller.disconnect(self._long_pressed_hid)
+        logging.debug('Palette._connected is False')
+        self._connected = False
+
 
     def get_default_position(self):
         return self.AT_CURSOR

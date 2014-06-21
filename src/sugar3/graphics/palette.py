@@ -223,6 +223,10 @@ class Palette(PaletteWindow):
             self._secondary_anim.stop()
 
     def popdown(self, immediate=False):
+        if self._invoker and not None and \
+           self._invoker._ignore is True:
+            return
+
         if immediate:
             self._secondary_anim.stop()
             # to suppress glitches while later re-opening

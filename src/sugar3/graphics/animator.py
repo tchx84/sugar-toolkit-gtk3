@@ -31,6 +31,7 @@ EASE_IN_EXPO = 1
 class Animator(GObject.GObject):
 
     __gsignals__ = {
+        'started': (GObject.SignalFlags.RUN_FIRST, None, ([])),
         'completed': (GObject.SignalFlags.RUN_FIRST, None, ([])),
     }
 
@@ -51,6 +52,7 @@ class Animator(GObject.GObject):
         self._animations = []
 
     def start(self):
+        self.emit('started')
         if self._timeout_sid:
             self.stop()
 

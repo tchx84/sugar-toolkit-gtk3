@@ -156,6 +156,9 @@ class Palette(PaletteWindow):
 
         self._secondary_anim = animator.Animator(2.0, 10)
         self._secondary_anim.add(_SecondaryAnimation(self))
+        #self._secondary_anim.connect('started', self._ignore_events)
+        #self._secondary_anim.connect('completed', self._listen_events)
+        
 
         # we init after initializing all of our containers
         PaletteWindow.__init__(self, **kwargs)
@@ -223,6 +226,11 @@ class Palette(PaletteWindow):
             self._secondary_anim.stop()
 
     def popdown(self, immediate=False):
+        if self._invoker and not None and \
+           hasattr(self._invoker, '_ignore') and \
+           self._invoker._ignore is True:
+            return
+
         if immediate:
             self._secondary_anim.stop()
             # to suppress glitches while later re-opening

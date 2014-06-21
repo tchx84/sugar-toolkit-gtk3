@@ -37,6 +37,9 @@ from sugar3.graphics import animator
 from sugar3.graphics import style
 
 
+_IGNORE_TIMEOUT = 250
+
+
 def _calculate_gap(a, b):
     """Helper function to find the gap position and size of widget a"""
     # Test for each side if the palette and invoker are
@@ -518,6 +521,10 @@ class PaletteWindow(GObject.GObject):
 
         self._mouse_detector = MouseSpeedDetector(200, 5)
 
+    def _ignore_events(self):
+        if self._invoker is not None:
+            self._invoker.ignore_events()
+
     def _setup_widget(self):
         self._widget.connect('show', self.__show_cb)
         self._widget.connect('hide', self.__hide_cb)
@@ -662,6 +669,7 @@ class PaletteWindow(GObject.GObject):
         else:
             self._popup_anim.stop()
             self._widget.popup(self._invoker)
+            self._ignore_events()
             # we have to invoke update_position() twice
             # since WM could ignore first move() request
             self.update_position()
@@ -676,6 +684,7 @@ class PaletteWindow(GObject.GObject):
             self._popdown_anim.stop()
             if self._widget is not None:
                 self._widget.popdown()
+                self._ignore_events()
 
     def on_invoker_enter(self):
         self._popdown_anim.stop()
@@ -1092,9 +1101,31 @@ class WidgetInvoker(Invoker):
         self._long_pressed_recognized = False
         self._long_pressed_hid = None
         self._long_pressed_controller = SugarGestures.LongPressController()
+        self._ignore = False
 
         if parent or widget:
             self.attach_widget(parent, widget)
+
+    def ignore_events(self):
+        if self._ignore is True:
+            return
+        self._ignore = True
+
+        self._widget.handler_block(self._enter_hid)
+        self._widget.handler_block(self._leave_hid)
+        self._widget.handler_block(self._click_hid)
+        self._widget.handler_block(self._touch_hid)
+        self._widget.handler_block(self._release_hid)
+
+        def _listen_events():
+            self._widget.handler_unblock(self._enter_hid)
+            self._widget.handler_unblock(self._leave_hid)
+            self._widget.handler_unblock(self._click_hid)
+            self._widget.handler_unblock(self._touch_hid)
+            self._widget.handler_unblock(self._release_hid)
+            self._ignore = False
+
+        GLib.timeout_add(_IGNORE_TIMEOUT, _listen_events)
 
     def attach_widget(self, parent, widget=None):
         if widget:
@@ -1275,9 +1306,27 @@ class CursorInvoker(Invoker):
         self._long_pressed_recognized = False
         self._long_pressed_hid = None
         self._long_pressed_controller = SugarGestures.LongPressController()
+        self._ignore = False
 
         if parent:
             self.attach(parent)
+
+    def ignore_events(self):
+        if self._ignore is True:
+            return
+        self._ignore = True
+
+        self._item.handler_block(self._enter_hid)
+        self._item.handler_block(self._leave_hid)
+        self._item.handler_block(self._release_hid)
+
+        def _listen_events():
+            self._item.handler_unblock(self._enter_hid)
+            self._item.handler_unblock(self._leave_hid)
+            self._item.handler_unblock(self._release_hid)
+            self._ignore = False
+
+        GLib.timeout_add(_IGNORE_TIMEOUT, _listen_events)
 
     def attach(self, parent):
         Invoker.attach(self, parent)

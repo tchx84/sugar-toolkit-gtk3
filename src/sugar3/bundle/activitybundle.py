@@ -328,7 +328,7 @@ class ActivityBundle(Bundle):
 
         return install_path
 
-    def install_mime_type(self, install_path):
+    def install_mime_type(self, install_path, no_mime_update=False):
         """ Update the mime type database and install the mime type icon
         """
         xdg_data_home = os.getenv('XDG_DATA_HOME',
@@ -343,8 +343,9 @@ class ActivityBundle(Bundle):
             installed_mime_path = os.path.join(mime_pkg_dir,
                                                '%s.xml' % self._bundle_id)
             self._symlink(mime_path, installed_mime_path)
-            os.spawnlp(os.P_WAIT, 'update-mime-database',
-                       'update-mime-database', mime_dir)
+            if no_mime_update is False:
+                os.spawnlp(os.P_WAIT, 'update-mime-database',
+                           'update-mime-database', mime_dir)
 
         mime_types = self.get_mime_types()
         if mime_types is not None:

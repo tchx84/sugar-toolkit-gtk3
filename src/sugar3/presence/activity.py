@@ -49,6 +49,11 @@ CONN_INTERFACE_ROOM_CONFIG = \
 _logger = logging.getLogger('sugar3.presence.activity')
 
 
+def _tubes_available():
+    # XXX I know I am in Fedora 23, so no TUBES.
+    return False
+
+
 class Activity(GObject.GObject):
     """UI interface for an Activity in the presence service
 
@@ -456,8 +461,11 @@ class Activity(GObject.GObject):
         """
         bus_name = self.telepathy_conn.requested_bus_name
         connection_path = self.telepathy_conn.object_path
-        channels = [self.telepathy_text_chan.object_path,
-                    self.telepathy_tubes_chan.object_path]
+
+        # XXX don't include the tubes channel, if no TUBES.
+        channels = [self.telepathy_text_chan.object_path]
+        if _tubes_available():
+            channels.append(self.telepathy_tubes_chan.object_path)
 
         _logger.debug('%r: bus name is %s, connection is %s, channels are %r' %
                       (self, bus_name, connection_path, channels))
@@ -575,6 +583,10 @@ class _JoinCommand(_BaseCommand):
             error_handler=self.__error_handler_cb,
             dbus_interface=CONNECTION)
 
+        # XXX skip channel creation, if no TUBES.
+        if not _tubes_available():
+            return
+
         self._connection.RequestChannel(
             CHANNEL_TYPE_TUBES,
             HANDLE_TYPE_ROOM,
@@ -604,7 +616,12 @@ class _JoinCommand(_BaseCommand):
     def __text_channel_ready_cb(self, channel):
         _logger.debug('%r: Text channel %r is ready' % (self, channel))
         self.text_channel = channel
-        self._tubes_ready()
+
+        # XXX finish the creation process already, if no TUBES.
+        if not _tubes_available():
+            self._add_self_to_channel()
+        else:
+            self._tubes_ready()
 
     def _tubes_ready(self):
         if self.text_channel is None or \
